@@ -40,14 +40,14 @@ async def restart_browser():
     await asyncio.sleep(1)
 
     # Create and start fresh browser with user's Chrome profile
-    # Using 'AutomationProfile' to avoid conflicts with your main Chrome
+    # Using 'Profile 16' - your specific Chrome profile
     browser = Browser(
         headless=False,
         keep_alive=True,
         window_size={'width': 1280, 'height': 720},
         executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
-        profile_directory='AutomationProfile'
+        profile_directory='Profile 16'
     )
 
     await browser.start()
@@ -65,14 +65,14 @@ async def get_or_start_browser():
         return browser
 
     # Create new browser instance with user's Chrome profile
-    # Using 'AutomationProfile' to avoid conflicts with your main Chrome
+    # Using 'Profile 16' - your specific Chrome profile
     browser = Browser(
         headless=False,  # VISIBLE - You can watch!
         keep_alive=True,  # Keep browser open between tasks
         window_size={'width': 1280, 'height': 720},
         executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
-        profile_directory='AutomationProfile'
+        profile_directory='Profile 16'
     )
 
     # Start the browser
@@ -354,12 +354,9 @@ async def main():
         import traceback
         traceback.print_exc()
     finally:
-        # Cleanup
-        if browser:
-            try:
-                await browser.stop()
-            except:
-                pass
+        # Keep browser open - don't close it when script exits
+        print("\n🌐 Browser will remain open. Close it manually when you're done.\n")
+        pass
 
 
 if __name__ == "__main__":
