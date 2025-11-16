@@ -1,6 +1,6 @@
 """
 🤖 OpenAI Agents SDK × Browser-Use Orchestrator
-Immediate execution with proper browser initialization
+Following simplified architecture with error recovery
 """
 
 import asyncio
@@ -23,79 +23,11 @@ load_dotenv()
 browser: Optional[Browser] = None
 _last_history: Optional[AgentHistoryList] = None
 
-
-async def restart_browser():
-    """Restart browser from scratch with timeout handling"""
-    global browser
-
-    # Close existing browser
-    if browser:
-        try:
-            await browser.stop()
-        except:
-            pass
-        browser = None
-
-    # Wait longer for cleanup - Chrome needs time to fully close
-    print("⏳ Waiting for Chrome to close completely...")
-    await asyncio.sleep(3)
-
-    # Create fresh browser with user's Chrome profile
-    # Using 'Profile 16' - your specific Chrome profile
-    browser = Browser(
-        headless=False,
-        keep_alive=True,
-        window_size={'width': 1280, 'height': 720},
-        executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
-        user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
-        profile_directory='Profile 16',
-        # Add extra args to speed up Chrome startup
-        extra_chromium_args=[
-            '--disable-extensions',  # Disable extensions to speed up startup
-            '--disable-dev-shm-usage',
-            '--no-first-run',
-            '--no-default-browser-check',
-            '--disable-popup-blocking',
-        ]
-    )
-
-    # Retry browser start with longer timeout
-    max_start_attempts = 3
-    for attempt in range(max_start_attempts):
-        try:
-            print(f"🚀 Starting browser (attempt {attempt + 1}/{max_start_attempts})...")
-
-            # Use asyncio.wait_for with longer timeout (90 seconds)
-            await asyncio.wait_for(browser.start(), timeout=90.0)
-
-            print("✅ Browser started successfully!\n")
-            return browser
-
-        except asyncio.TimeoutError:
-            print(f"⚠️  Browser start timeout on attempt {attempt + 1}")
-            if attempt < max_start_attempts - 1:
-                print("🔄 Retrying with fresh instance...\n")
-                await asyncio.sleep(2)
-                # Recreate browser instance for retry
-                browser = Browser(
-                    headless=False,
-                    keep_alive=True,
-                    window_size={'width': 1280, 'height': 720},
-                    executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
-                    user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
-                    profile_directory='Profile 16',
-                    extra_chromium_args=[
-                        '--disable-extensions',  # Disable extensions to speed up startup
-                        '--disable-dev-shm-usage',
-                        '--no-first-run',
-                        '--no-default-browser-check',
-                        '--disable-popup-blocking',
-                    ]
-                )
-            else:
-                raise Exception("Browser failed to start after multiple attempts. Please close all Chrome windows and try again.")
-
-    return browser
+# System message to enforce Google search
+extend_system_message = (
+    "Always use Google (https://www.google.com) as the only search engine for finding information. "
+    "Do not use any other source or any direct link open follow the google search engine path under any circumstances."
+)
 
 
 async def get_or_start_browser():
@@ -104,10 +36,11 @@ async def get_or_start_browser():
 
     # If browser already exists, return it
     if browser:
+        print("♻️  Reusing existing browser session")
         return browser
 
     # Create new browser instance with user's Chrome profile
-    # Using 'Profile 16' - your specific Chrome profile
+    print("🚀 Starting new browser session...")
     browser = Browser(
         headless=False,  # VISIBLE - You can watch!
         keep_alive=True,  # Keep browser open between tasks
@@ -115,9 +48,8 @@ async def get_or_start_browser():
         executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
         profile_directory='Profile 16',
-        # Add extra args to speed up Chrome startup
         extra_chromium_args=[
-            '--disable-extensions',  # Disable extensions to speed up startup
+            '--disable-extensions',
             '--disable-dev-shm-usage',
             '--no-first-run',
             '--no-default-browser-check',
@@ -129,20 +61,16 @@ async def get_or_start_browser():
     max_start_attempts = 3
     for attempt in range(max_start_attempts):
         try:
-            print(f"🚀 Starting browser (attempt {attempt + 1}/{max_start_attempts})...")
-
-            # Use asyncio.wait_for with longer timeout (90 seconds)
+            print(f"   Attempt {attempt + 1}/{max_start_attempts}...")
             await asyncio.wait_for(browser.start(), timeout=90.0)
-
-            print("✅ Browser started successfully! It will stay open for all tasks.\n")
+            print("✅ Browser started successfully!\n")
             return browser
 
         except asyncio.TimeoutError:
-            print(f"⚠️  Browser start timeout on attempt {attempt + 1}")
+            print(f"⚠️  Timeout on attempt {attempt + 1}")
             if attempt < max_start_attempts - 1:
-                print("🔄 Retrying with fresh instance...\n")
+                print("🔄 Retrying...\n")
                 await asyncio.sleep(2)
-                # Recreate browser instance for retry
                 browser = Browser(
                     headless=False,
                     keep_alive=True,
@@ -151,7 +79,7 @@ async def get_or_start_browser():
                     user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
                     profile_directory='Profile 16',
                     extra_chromium_args=[
-                        '--disable-extensions',  # Disable extensions to speed up startup
+                        '--disable-extensions',
                         '--disable-dev-shm-usage',
                         '--no-first-run',
                         '--no-default-browser-check',
@@ -165,13 +93,15 @@ async def get_or_start_browser():
 
 
 @function_tool
-async def browser_automation(task: str, url: str = "") -> dict:
+async def Automation(task: str) -> str:
     """
-    Execute browser automation immediately. Just describe what you want to do.
+    Execute browser automation tasks using BrowserAgent.
 
     Args:
-        task: What to do (e.g., "Open YouTube and search for Honey Singh songs")
-        url: Starting URL if known (optional)
+        task: Description of what to do (e.g., "open LinkedIn and like my 2 feed posts")
+
+    Returns:
+        str: Result of the automation or error message
     """
     global _last_history
 
@@ -179,244 +109,97 @@ async def browser_automation(task: str, url: str = "") -> dict:
     print("🌐 EXECUTING BROWSER AUTOMATION")
     print("="*70)
     print(f"📋 Task: {task}")
-    if url:
-        print(f"🌐 URL: {url}")
-    print(f"👁️  Browser: VISIBLE ✓")
     print("="*70 + "\n")
 
-    # Retry logic for connection errors
-    max_retries = 2
-    for attempt in range(max_retries):
-        try:
-            # Build task
-            full_task = task
-            if url:
-                full_task = f"Navigate to {url}\n{task}"
+    try:
+        # Get or start browser (reuses existing browser)
+        browser_instance = await get_or_start_browser()
 
-            # Get or start browser (reuses existing browser)
-            if attempt == 0:
-                browser_instance = await get_or_start_browser()
-            else:
-                # On retry, restart browser
-                print(f"🔄 Retry {attempt}/{max_retries-1} - Restarting browser...\n")
-                browser_instance = await restart_browser()
+        # Create LLM
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            api_key=os.getenv("OPENAI_API_KEY"),
+            temperature=0.0
+        )
 
-            # Create browser agent
-            llm = ChatOpenAI(
-                model="gpt-4o-mini",
-                api_key=os.getenv("OPENAI_API_KEY"),
-                temperature=0.0
-            )
+        # Create browser agent with extended system message
+        agent = BrowserAgent(
+            task=task,
+            llm=llm,
+            extend_system_message=extend_system_message,
+            browser=browser_instance,
+            use_vision=True,
+        )
 
-            print("⏳ Executing automation...\n")
+        print("⏳ Executing automation...\n")
 
-            agent = BrowserAgent(
-                task=full_task,
-                llm=llm,
-                browser=browser_instance,
-                use_vision=True,
-            )
+        # Execute
+        history = await agent.run(max_steps=50)
+        _last_history = history
 
-            # Execute
-            history = await agent.run(max_steps=50)
-            _last_history = history
-
-            print("\n" + "="*70)
-            print("✅ AUTOMATION COMPLETED")
+        # Check for errors
+        if history.has_errors():
+            print("\n⚠️  Task completed with errors")
             print("="*70)
-            print(f"📊 Steps: {history.number_of_steps()}")
-            print(f"⏱️  Duration: {history.total_duration_seconds():.2f}s")
-            print(f"✓ Success: {history.is_successful()}")
-            print("="*70)
-            print("🌐 Browser stays open - ready for next task!\n")
 
-            # DON'T close browser - keep it open for next task
+            # Return error info for continue_workflow to handle
+            error_details = []
+            for step in history.history:
+                if hasattr(step, 'error') and step.error:
+                    error_details.append(str(step.error))
 
-            return {
-                "status": "success",
-                "result": str(history.final_result()) if history.final_result() else "Task completed",
-                "steps": history.number_of_steps(),
-                "success": history.is_successful()
-            }
+            return f"Task encountered errors: {'; '.join(error_details) if error_details else 'Check history for details'}"
 
-        except Exception as e:
-            error_msg = str(e)
+        # Success
+        print("\n" + "="*70)
+        print("✅ AUTOMATION COMPLETED SUCCESSFULLY")
+        print("="*70)
+        print(f"📊 Steps: {history.number_of_steps()}")
+        print(f"⏱️  Duration: {history.total_duration_seconds():.2f}s")
+        print("="*70)
+        print("🌐 Browser stays open - ready for next task!\n")
 
-            # Check error type and decide whether to retry
-            is_retryable = False
+        result = str(history.final_result()) if history.final_result() else "Task completed successfully"
+        return result
 
-            if "ConnectionClosedError" in error_msg or "no close frame" in error_msg:
-                is_retryable = True
-                error_type = "Connection error"
-            elif "TimeoutError" in error_msg or "timed out" in error_msg:
-                is_retryable = True
-                error_type = "Timeout error"
-            elif "Event handler" in error_msg and "timed out" in error_msg:
-                is_retryable = True
-                error_type = "Browser event timeout"
-            else:
-                error_type = "Error"
+    except Exception as e:
+        error_msg = str(e)
+        print(f"\n❌ Error: {error_msg}\n")
+        print("🌐 Browser stays open - you can try again!\n")
 
-            if is_retryable and attempt < max_retries - 1:
-                print(f"\n⚠️  {error_type} detected. Retrying with fresh browser...\n")
-                continue  # Retry with fresh browser
-            elif is_retryable and attempt >= max_retries - 1:
-                print(f"\n❌ {error_type} persists after {max_retries} attempts.")
-                print("💡 Suggestions:")
-                print("   1. Close ALL Chrome windows completely")
-                print("   2. Wait a few seconds")
-                print("   3. Try again")
-                print("   4. If issue persists, restart your computer\n")
-            else:
-                # Non-retryable error
-                print(f"\n❌ {error_type}: {error_msg}\n")
-
-            print("🌐 Browser stays open - you can try again or give a new task!\n")
-
-            return {
-                "status": "error",
-                "error": error_msg
-            }
-
-    # Should not reach here, but just in case
-    return {
-        "status": "error",
-        "error": "Max retries exceeded"
-    }
+        # Return error for potential retry
+        return f"Error during automation: {error_msg}"
 
 
 @function_tool
-async def ask_user(question: str) -> str:
+async def required_info(question: str) -> str:
     """
-    Ask the user a question when you need specific information.
-    Only use this when absolutely necessary (e.g., login credentials, specific preferences).
+    Ask the user for required information.
+    Only use when absolutely necessary.
 
     Args:
         question: The question to ask the user
+
+    Returns:
+        str: The user's response
     """
-    print(f"\n❓ {question}")
-    answer = input("👤 Your answer: ").strip()
-    return answer
+    answer = input(f'{question} > ')
+    return f'The human responded with: {answer}'
 
 
-class BrowserOrchestrator:
-    """Main orchestrator"""
+# Continue workflow agent for error recovery
+continue_workflow = OpenAIAgent(
+    name="Complete the remaining work",
+    instructions="""You're required to complete the remaining work as per the initial instructions.
 
-    def __init__(self):
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
-
-        if not self.openai_api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment")
-
-        # Create main agent
-        self.agent = OpenAIAgent(
-            name="Browser Automation Agent",
-            model="gpt-4o",
-            instructions="""You are a Browser Automation Agent that executes tasks immediately.
-
-**Core Principles:**
-
-1. **Try first, ask later** - Always attempt the task first. The browser might already be logged in or have the needed access.
-2. **Execute immediately** - Call browser_automation tool right away without asking for permission
-3. **Assume browser state exists** - User might already be logged in to sites, tabs might already be open, etc.
-4. **Only ask when browser agent fails** - If automation fails due to missing login, THEN ask for credentials
-
-**How to handle requests:**
-
-- Call browser_automation immediately with the task
-- Let the browser agent try the task first
-- The browser agent will handle navigation, detect login requirements, etc.
-- If automation returns an error about needing login or missing info, THEN use ask_user
-- After automation completes, briefly confirm what was done
-
-**When to use ask_user:**
-- ONLY AFTER browser_automation fails and reports it needs credentials/info
-- ONLY when browser agent explicitly says it encountered a login page
-- NOT before trying the automation
-- NOT for confirmations or permissions
-- NOT preemptively "just in case"
-
-**Examples:**
-
-User: "go to linkedin and like my post"
-You: *immediately call browser_automation* (don't ask for password first!)
-→ If browser agent returns "login required", THEN ask for credentials
-→ If browser agent succeeds (already logged in), done!
-
-User: "check my gmail"
-You: *immediately call browser_automation* (don't ask which email!)
-→ If browser agent is already on Gmail, it uses that
-→ If browser agent needs login, THEN ask
-
-**What NOT to do:**
-- Don't ask "Do you need to login?" - Just try!
-- Don't ask for credentials upfront - Try first!
-- Don't ask "Should I proceed?" - Just proceed!
-- Don't over-explain - Execute first, summarize after
-
-Your job is to TRY the automation immediately, and only ask questions if the browser agent actually needs something.""",
-            tools=[browser_automation, ask_user],
-        )
-
-        print("✅ OpenAI Agent initialized")
-
-    def print_banner(self):
-        """Print welcome banner"""
-        print("\n" + "="*70)
-        print("🤖 BROWSER AUTOMATION AGENT")
-        print("="*70)
-        print("Powered by: OpenAI Agents SDK + Browser-Use")
-        print("\n💡 Tell me any browser task - I'll execute it immediately!")
-        print("   Browser window will be VISIBLE - watch it work!")
-        print("   Browser STAYS OPEN between tasks (new tabs for each task)")
-        print("   Type 'exit' to quit and close the browser\n")
-
-    async def chat(self, user_message: str):
-        """Process user message"""
-
-        # Run the agent
-        result = await Runner.run(self.agent, input=user_message)
-
-        # Display response
-        print(f"\n🤖 Agent: {result.final_output}\n")
-
-        return result.final_output
-
-    async def interactive_mode(self):
-        """Run interactive chat"""
-
-        self.print_banner()
-
-        while True:
-            try:
-                # Get user input
-                user_input = input("👤 You: ").strip()
-
-                if not user_input:
-                    continue
-
-                if user_input.lower() in ['exit', 'quit', 'q']:
-                    print("\n👋 Goodbye!\n")
-                    break
-
-                # Process
-                await self.chat(user_input)
-
-            except KeyboardInterrupt:
-                print("\n\n👋 Goodbye!\n")
-                break
-            except Exception as e:
-                print(f"\n❌ Error: {str(e)}\n")
-
-    async def run_single_task(self, task: str):
-        """Run single task"""
-
-        print("\n" + "="*70)
-        print("🤖 BROWSER AUTOMATION AGENT")
-        print("="*70)
-        print(f"📋 Task: {task}\n")
-
-        await self.chat(task)
+    If the previous automation encountered errors:
+    1. Analyze what went wrong
+    2. Use required_info if you need additional information from the user
+    3. Try Automation again with adjusted approach
+    4. Don't give up - keep trying alternative approaches
+    """,
+    tools=[Automation, required_info],
+)
 
 
 async def main():
@@ -429,32 +212,58 @@ async def main():
         print("="*70)
         print("\nPlease create a .env file with:")
         print("OPENAI_API_KEY=sk-proj-your_actual_key_here")
-        print("\nGet your key at: https://platform.openai.com/api-keys")
         print("="*70 + "\n")
         return
 
-    try:
-        # Create orchestrator
-        orchestrator = BrowserOrchestrator()
+    # Create main agent
+    agent = OpenAIAgent(
+        name="Automation Agent",
+        instructions="""
+        You are a helpful assistant designed to perform automated tasks efficiently.
 
-        # Check if running in interactive or single task mode
-        import sys
-        if len(sys.argv) > 1:
-            # Single task mode
-            task = " ".join(sys.argv[1:])
-            await orchestrator.run_single_task(task)
-        else:
-            # Interactive mode
-            await orchestrator.interactive_mode()
+        **Core Principles:**
+        1. Always use the Automation tool for browser automation tasks
+        2. Execute tasks immediately - don't say "not possible" without trying first
+        3. Only use required_info when absolutely necessary to obtain specific information
+        4. Do NOT call required_info at the beginning - only when you actually need user input
+        5. If automation returns errors, analyze and retry with adjustments
+        6. Be persistent but smart about retries
 
-    except Exception as e:
-        print(f"\n❌ Fatal Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        # Keep browser open - don't close it when script exits
-        print("\n🌐 Browser will remain open. Close it manually when you're done.\n")
-        pass
+        **Workflow:**
+        - User gives task → Call Automation immediately
+        - If Automation succeeds → Report success
+        - If Automation has errors → Analyze, ask for info if needed, retry
+        - Only use required_info when you truly need additional context from the user
+        """,
+        tools=[Automation, required_info],
+        handoffs=[continue_workflow],
+    )
+
+    # Print welcome banner
+    print("\n" + "="*70)
+    print("🤖 BROWSER AUTOMATION AGENT")
+    print("="*70)
+    print("Powered by: OpenAI Agents SDK + Browser-Use")
+    print("\n💡 Tell me any browser task - I'll execute it immediately!")
+    print("   Browser window will be VISIBLE - watch it work!")
+    print("   Browser STAYS OPEN between tasks")
+    print("   Type 'exit' to quit\n")
+
+    # Main interaction loop
+    while True:
+        user_input = input("User: ")
+
+        if user_input.lower() in ['exit', 'quit', 'q']:
+            print("\n👋 Exiting the Automation agent.")
+            print("🌐 Browser will remain open. Close it manually when done.\n")
+            break
+
+        if not user_input.strip():
+            continue
+
+        # Run the agent
+        result = await Runner.run(agent, user_input)
+        print(f"\nAgent: {result.final_output}\n")
 
 
 if __name__ == "__main__":
