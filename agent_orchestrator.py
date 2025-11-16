@@ -49,10 +49,9 @@ async def restart_browser():
         executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
         profile_directory='Profile 16',
-        # Disable extensions to speed up startup
-        disable_extensions=True,
         # Add extra args to speed up Chrome startup
         extra_chromium_args=[
+            '--disable-extensions',  # Disable extensions to speed up startup
             '--disable-dev-shm-usage',
             '--no-first-run',
             '--no-default-browser-check',
@@ -85,8 +84,8 @@ async def restart_browser():
                     executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
                     user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
                     profile_directory='Profile 16',
-                    disable_extensions=True,
                     extra_chromium_args=[
+                        '--disable-extensions',  # Disable extensions to speed up startup
                         '--disable-dev-shm-usage',
                         '--no-first-run',
                         '--no-default-browser-check',
@@ -116,10 +115,9 @@ async def get_or_start_browser():
         executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
         profile_directory='Profile 16',
-        # Disable extensions to speed up startup
-        disable_extensions=True,
         # Add extra args to speed up Chrome startup
         extra_chromium_args=[
+            '--disable-extensions',  # Disable extensions to speed up startup
             '--disable-dev-shm-usage',
             '--no-first-run',
             '--no-default-browser-check',
@@ -152,8 +150,8 @@ async def get_or_start_browser():
                     executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
                     user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
                     profile_directory='Profile 16',
-                    disable_extensions=True,
                     extra_chromium_args=[
+                        '--disable-extensions',  # Disable extensions to speed up startup
                         '--disable-dev-shm-usage',
                         '--no-first-run',
                         '--no-default-browser-check',
