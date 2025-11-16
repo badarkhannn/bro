@@ -48,7 +48,7 @@ async def get_or_start_browser():
         executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
         profile_directory='Profile 16',
-        extra_chromium_args=[
+        args=[
             '--disable-extensions',
             '--disable-dev-shm-usage',
             '--no-first-run',
@@ -78,7 +78,7 @@ async def get_or_start_browser():
                     executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
                     user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
                     profile_directory='Profile 16',
-                    extra_chromium_args=[
+                    args=[
                         '--disable-extensions',
                         '--disable-dev-shm-usage',
                         '--no-first-run',
