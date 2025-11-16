@@ -25,7 +25,7 @@ _last_history: Optional[AgentHistoryList] = None
 
 
 async def restart_browser():
-    """Restart browser from scratch"""
+    """Restart browser from scratch with timeout handling"""
     global browser
 
     # Close existing browser
@@ -36,10 +36,11 @@ async def restart_browser():
             pass
         browser = None
 
-    # Wait a moment for cleanup
-    await asyncio.sleep(1)
+    # Wait longer for cleanup - Chrome needs time to fully close
+    print("⏳ Waiting for Chrome to close completely...")
+    await asyncio.sleep(3)
 
-    # Create and start fresh browser with user's Chrome profile
+    # Create fresh browser with user's Chrome profile
     # Using 'Profile 16' - your specific Chrome profile
     browser = Browser(
         headless=False,
@@ -47,17 +48,59 @@ async def restart_browser():
         window_size={'width': 1280, 'height': 720},
         executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
-        profile_directory='Profile 16'
+        profile_directory='Profile 16',
+        # Disable extensions to speed up startup
+        disable_extensions=True,
+        # Add extra args to speed up Chrome startup
+        extra_chromium_args=[
+            '--disable-dev-shm-usage',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-popup-blocking',
+        ]
     )
 
-    await browser.start()
-    print("🌐 Browser restarted!\n")
+    # Retry browser start with longer timeout
+    max_start_attempts = 3
+    for attempt in range(max_start_attempts):
+        try:
+            print(f"🚀 Starting browser (attempt {attempt + 1}/{max_start_attempts})...")
+
+            # Use asyncio.wait_for with longer timeout (90 seconds)
+            await asyncio.wait_for(browser.start(), timeout=90.0)
+
+            print("✅ Browser started successfully!\n")
+            return browser
+
+        except asyncio.TimeoutError:
+            print(f"⚠️  Browser start timeout on attempt {attempt + 1}")
+            if attempt < max_start_attempts - 1:
+                print("🔄 Retrying with fresh instance...\n")
+                await asyncio.sleep(2)
+                # Recreate browser instance for retry
+                browser = Browser(
+                    headless=False,
+                    keep_alive=True,
+                    window_size={'width': 1280, 'height': 720},
+                    executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
+                    user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
+                    profile_directory='Profile 16',
+                    disable_extensions=True,
+                    extra_chromium_args=[
+                        '--disable-dev-shm-usage',
+                        '--no-first-run',
+                        '--no-default-browser-check',
+                        '--disable-popup-blocking',
+                    ]
+                )
+            else:
+                raise Exception("Browser failed to start after multiple attempts. Please close all Chrome windows and try again.")
 
     return browser
 
 
 async def get_or_start_browser():
-    """Get existing browser or start new one"""
+    """Get existing browser or start new one with timeout handling"""
     global browser
 
     # If browser already exists, return it
@@ -72,13 +115,53 @@ async def get_or_start_browser():
         window_size={'width': 1280, 'height': 720},
         executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
-        profile_directory='Profile 16'
+        profile_directory='Profile 16',
+        # Disable extensions to speed up startup
+        disable_extensions=True,
+        # Add extra args to speed up Chrome startup
+        extra_chromium_args=[
+            '--disable-dev-shm-usage',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-popup-blocking',
+        ]
     )
 
-    # Start the browser
-    await browser.start()
+    # Retry browser start with longer timeout
+    max_start_attempts = 3
+    for attempt in range(max_start_attempts):
+        try:
+            print(f"🚀 Starting browser (attempt {attempt + 1}/{max_start_attempts})...")
 
-    print("🌐 Browser started! It will stay open for all tasks.\n")
+            # Use asyncio.wait_for with longer timeout (90 seconds)
+            await asyncio.wait_for(browser.start(), timeout=90.0)
+
+            print("✅ Browser started successfully! It will stay open for all tasks.\n")
+            return browser
+
+        except asyncio.TimeoutError:
+            print(f"⚠️  Browser start timeout on attempt {attempt + 1}")
+            if attempt < max_start_attempts - 1:
+                print("🔄 Retrying with fresh instance...\n")
+                await asyncio.sleep(2)
+                # Recreate browser instance for retry
+                browser = Browser(
+                    headless=False,
+                    keep_alive=True,
+                    window_size={'width': 1280, 'height': 720},
+                    executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
+                    user_data_dir=r'C:\Users\badar\AppData\Local\Google\Chrome\User Data',
+                    profile_directory='Profile 16',
+                    disable_extensions=True,
+                    extra_chromium_args=[
+                        '--disable-dev-shm-usage',
+                        '--no-first-run',
+                        '--no-default-browser-check',
+                        '--disable-popup-blocking',
+                    ]
+                )
+            else:
+                raise Exception("Browser failed to start after multiple attempts. Please close all Chrome windows and try again.")
 
     return browser
 
@@ -161,17 +244,34 @@ async def browser_automation(task: str, url: str = "") -> dict:
         except Exception as e:
             error_msg = str(e)
 
-            # Check if it's a connection error
+            # Check error type and decide whether to retry
+            is_retryable = False
+
             if "ConnectionClosedError" in error_msg or "no close frame" in error_msg:
-                if attempt < max_retries - 1:
-                    print(f"\n⚠️  Connection error detected. Retrying with fresh browser...\n")
-                    continue  # Retry with fresh browser
-                else:
-                    print(f"\n❌ Connection error persists after {max_retries} attempts.")
-                    print("💡 Try: Close ALL Chrome windows and run the script again.\n")
+                is_retryable = True
+                error_type = "Connection error"
+            elif "TimeoutError" in error_msg or "timed out" in error_msg:
+                is_retryable = True
+                error_type = "Timeout error"
+            elif "Event handler" in error_msg and "timed out" in error_msg:
+                is_retryable = True
+                error_type = "Browser event timeout"
             else:
-                # Non-connection error, don't retry
-                print(f"\n❌ Error: {error_msg}\n")
+                error_type = "Error"
+
+            if is_retryable and attempt < max_retries - 1:
+                print(f"\n⚠️  {error_type} detected. Retrying with fresh browser...\n")
+                continue  # Retry with fresh browser
+            elif is_retryable and attempt >= max_retries - 1:
+                print(f"\n❌ {error_type} persists after {max_retries} attempts.")
+                print("💡 Suggestions:")
+                print("   1. Close ALL Chrome windows completely")
+                print("   2. Wait a few seconds")
+                print("   3. Try again")
+                print("   4. If issue persists, restart your computer\n")
+            else:
+                # Non-retryable error
+                print(f"\n❌ {error_type}: {error_msg}\n")
 
             print("🌐 Browser stays open - you can try again or give a new task!\n")
 
